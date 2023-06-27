@@ -145,6 +145,11 @@ function read_results(
     end
 end
 
+function get_column_names(store::EmulationModelStore, key::OptimizationContainerKey)
+    container = get_data_field(store, get_store_container_type(key))
+    return Tuple(names(container[key].values))
+end
+
 function get_dataset_size(store::EmulationModelStore, key::OptimizationContainerKey)
     container = get_data_field(store, get_store_container_type(key))
     return size(container[key].values)

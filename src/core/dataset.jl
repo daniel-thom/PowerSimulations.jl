@@ -129,13 +129,23 @@ mutable struct HDF5Dataset <: AbstractDataset
     resolution::Dates.Millisecond
     initial_timestamp::Dates.DateTime
     update_timestamp::Dates.DateTime
+    column_names::Tuple{Vararg{String}}
 end
 
 HDF5Dataset(values, column_dataset, resolution, initial_time) =
-    HDF5Dataset(values, column_dataset, 1, 0, resolution, initial_time, UNSET_INI_TIME)
+    HDF5Dataset(
+        values,
+        column_dataset,
+        1,
+        0,
+        resolution,
+        initial_time,
+        UNSET_INI_TIME,
+        Tuple(column_dataset[:]),
+    )
 
 function get_column_names(::OptimizationContainerKey, s::HDF5Dataset)
-    return s.column_dataset[:]
+    return s.column_names
 end
 
 """

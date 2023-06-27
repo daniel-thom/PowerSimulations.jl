@@ -175,12 +175,12 @@ function list_decision_model_keys(
     container_type::Symbol,
 )
     container = getfield(get_dm_data(store)[model], container_type)
-    return keys(container)
+    return collect(keys(container))
 end
 
 function list_emulation_model_keys(store::HdfSimulationStore, container_type::Symbol)
     container = getfield(get_em_data(store), container_type)
-    return keys(container)
+    return collect(keys(container))
 end
 
 function write_optimizer_stats!(
@@ -345,7 +345,7 @@ function read_result(
     if (ndims(data) < 2 || size(data)[1] == 1) && size(data)[2] != size(columns)[1]
         data = reshape(data, length(data), 1)
     end
-    return DataFrames.DataFrame(data, columns)
+    return DataFrames.DataFrame(data, collect(columns); copycols = false)
 end
 
 function read_result(
@@ -369,9 +369,10 @@ function read_result(
     if is_cached(store.cache, model_name, key, index)
         data = _read_result(store.cache, model_name, key, index)
     else
-        # PERF: If this will be commonly used then we need to remove reading of columns.
         data, _ = _read_result(store, model_name, key, index)
     end
+
+    return data
 end
 
 function read_results(
@@ -392,7 +393,29 @@ function read_results(
     end
     columns = get_column_names(key, dataset)
     @assert_op size(data)[2] == length(columns)
-    return DataFrames.DataFrame(data, columns)
+    return DataFrames.DataFrame(data, collect(columns))
+end
+
+function get_column_names(
+    store::HdfSimulationStore,
+    ::Type{DecisionModelIndexType},
+    model_name::Symbol,
+    key::OptimizationContainerKey,
+)
+    !isopen(store) && throw(ArgumentError("store must be opened prior to reading"))
+    dataset = _get_dm_dataset(store, model_name, key)
+    return get_column_names(key, dataset)
+end
+
+function get_column_names(
+    store::HdfSimulationStore,
+    ::Type{EmulationModelIndexType},
+    model_name::Symbol,
+    key::OptimizationContainerKey,
+)
+    !isopen(store) && throw(ArgumentError("store must be opened prior to reading"))
+    dataset = _get_em_dataset(store, key)
+    return get_column_names(key, dataset)
 end
 
 function get_emulation_model_dataset_size(

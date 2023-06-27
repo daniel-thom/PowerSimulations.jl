@@ -82,6 +82,8 @@ function write_optimizer_stats!(
     return
 end
 
+# TODO DT: This code needs to store the data in arrays instead of dataframes.
+
 function write_result!(
     store::InMemorySimulationStore,
     model_name::Symbol,
@@ -153,6 +155,24 @@ function initialize_problem_storage!(
     end
 
     return
+end
+
+function get_column_names(
+    store::InMemorySimulationStore,
+    ::Type{DecisionModelIndexType},
+    model_name::Symbol,
+    key::OptimizationContainerKey,
+)
+    return get_column_names(get_dm_data(store)[model_name], key)
+end
+
+function get_column_names(
+    store::InMemorySimulationStore,
+    ::Type{EmulationModelIndexType},
+    model_name::Symbol,
+    key::OptimizationContainerKey,
+)
+    return get_column_names(get_em_data(store)[model_name], key)
 end
 
 function read_result(

@@ -124,3 +124,8 @@ function read_optimizer_stats(store::DecisionModelStore)
     DataFrames.insertcols!(df, 1, :DateTime => keys(store.optimizer_stats))
     return df
 end
+
+function get_column_names(store::DecisionModelStore, key::OptimizationContainerKey)
+    container = getfield(store, get_store_container_type(key))
+    return Tuple(names(first(values(container[key]))))
+end
