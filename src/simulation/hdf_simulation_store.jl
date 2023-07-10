@@ -355,19 +355,25 @@ function read_result(
     key::OptimizationContainerKey,
     index::Union{DecisionModelIndexType, EmulationModelIndexType},
 )
-    data, columns = _read_data_columns(store, model_name, key, index)
+    if is_cached(store.cache, model_name, key, index)
+        data = read_result(store.cache, model_name, key, index)
+        columns = get_column_names(store, DecisionModelIndexType, model_name, key)
+    else
+        data, columns = _read_result(store, model_name, key, index)
+    end
+    # Prioritize row access.
     return DenseAxisArray(permutedims(data), columns, 1:size(data)[1])
 end
 
 function read_result(
-    ::Type{<:Array},
+    ::Type{Array},
     store::HdfSimulationStore,
     model_name::Symbol,
     key::OptimizationContainerKey,
     index::Union{DecisionModelIndexType, EmulationModelIndexType},
 )
     if is_cached(store.cache, model_name, key, index)
-        data = _read_result(store.cache, model_name, key, index)
+        data = read_result(store.cache, model_name, key, index)
     else
         data, _ = _read_result(store, model_name, key, index)
     end
@@ -381,6 +387,8 @@ function read_results(
     index::Union{Nothing, EmulationModelIndexType} = nothing,
     len::Union{Nothing, Int} = nothing,
 )
+    # TODO DT: remove redundancy
+    # Do we actually need this one?
     dataset = _get_em_dataset(store, key)
     @assert_op ndims(dataset.values) == 2
     if isnothing(index)
@@ -393,7 +401,8 @@ function read_results(
     end
     columns = get_column_names(key, dataset)
     @assert_op size(data)[2] == length(columns)
-    return DataFrames.DataFrame(data, collect(columns))
+    # Prioritize row access.
+    return DenseAxisArray(permutedims(data), columns, 1:size(data)[1])
 end
 
 function get_column_names(
@@ -410,7 +419,7 @@ end
 function get_column_names(
     store::HdfSimulationStore,
     ::Type{EmulationModelIndexType},
-    model_name::Symbol,
+    #model_name::Symbol,
     key::OptimizationContainerKey,
 )
     !isopen(store) && throw(ArgumentError("store must be opened prior to reading"))
@@ -423,12 +432,12 @@ function get_emulation_model_dataset_size(
     key::OptimizationContainerKey,
 )
     dataset = _get_em_dataset(store, key)
-    return size(dataset.values)
+    return size(dataset.values)[1]
 end
 
 function _read_result(
     store::HdfSimulationStore,
-    model_name::Symbol,
+    ::Symbol,
     key::OptimizationContainerKey,
     index::EmulationModelIndexType,
 )
@@ -850,7 +859,9 @@ function _read_data_columns(
     key::OptimizationContainerKey,
     index::DecisionModelIndexType,
 )
+    was_cached = false
     if is_cached(store.cache, model_name, key, index)
+        was_cached = true
         data = read_result(store.cache, model_name, key, index)
         column_dataset = _get_dm_dataset(store, model_name, key).column_dataset
         columns = column_dataset[:]

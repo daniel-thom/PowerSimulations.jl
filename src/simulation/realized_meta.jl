@@ -47,7 +47,7 @@ function RealizedMeta(
 end
 
 function get_realization(
-    results::Dict{OptimizationContainerKey, ResultsByTime},
+    results::Dict{OptimizationContainerKey, ResultsByTime{Matrix{Float64}}},
     meta::RealizedMeta,
 )
     realized_values = Dict{OptimizationContainerKey, DataFrames.DataFrame}()
@@ -59,22 +59,20 @@ function get_realization(
         columns = get_column_names(results_by_time)
         num_cols = length(columns)
         matrix = Matrix{Float64}(undef, num_rows, num_cols)
-        for (step, (_, data)) in enumerate(results_by_time)
+        for (step, (_, array)) in enumerate(results_by_time)
             first_id = step > 1 ? 1 : meta.start_offset
             last_id =
                 step == meta.len ? meta.interval_len - meta.end_offset : meta.interval_len
             # TODO DT: need to ensure that this accounts for the warning message I deleted in _read_results
-            if last_id - first_id > size(data, 1)
+            if last_id - first_id > size(array, 1)
                 error(
-                    "Variable $(encode_key_as_string(key)) has $(size(data, 1)) number of steps, that is different than the default problem horizon. \
+                    "Variable $(encode_key_as_string(key)) has $(size(array, 1)) number of steps, that is different than the default problem horizon. \
               Can't calculate the realized variables. Use `read_variables` instead and write your own concatenation",
                 )
             end
             row_start = (step - 1) * meta.interval_len + 1
             row_end = row_start + last_id - first_id
-            for col_index in 1:num_cols
-                matrix[row_start:row_end, col_index] = data[:, col_index][first_id:last_id]
-            end
+            matrix[row_start:row_end, :] = array[first_id:last_id, :]
         end
         df = DataFrames.DataFrame(matrix, collect(columns); copycols = false)
         DataFrames.insertcols!(

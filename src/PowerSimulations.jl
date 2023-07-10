@@ -454,6 +454,7 @@ include("core/cache_utils.jl")
 include("core/optimizer_stats.jl")
 include("core/dataset.jl")
 include("core/dataset_container.jl")
+include("core/results_by_time.jl")
 
 include("core/optimization_container.jl")
 include("core/store_common.jl")

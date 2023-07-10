@@ -1,47 +1,3 @@
-struct ResultsByTime
-    key::OptimizationContainerKey
-    data::SortedDict{Dates.DateTime, Matrix{Float64}}
-    columns::Tuple{Vararg{String}}
-    resolution::Dates.Period
-end
-
-# This struct behaves like a dict, delegating to its 'data' field.
-Base.length(res::ResultsByTime) = length(res.data)
-Base.iterate(res::ResultsByTime) = iterate(res.data)
-Base.iterate(res::ResultsByTime, state) = iterate(res.data, state)
-Base.getindex(res::ResultsByTime, i) = getindex(res.data, i)
-Base.setindex!(res::ResultsByTime, v, i) = setindex!(res.data, v, i)
-Base.firstindex(res::ResultsByTime) = firstindex(res.data)
-Base.lastindex(res::ResultsByTime) = lastindex(res.data)
-
-get_column_names(results::ResultsByTime) = results.columns
-
-function get_dataframe(results::ResultsByTime, timestamp::Dates.DateTime)
-    data = results.data[timestamp]
-    df = DataFrames.DataFrame(data, collect(results.columns))
-    time_col = range(timestamp; length = size(data, 1), step = results.resolution)
-    DataFrames.insertcols!(df, 1, :DateTime => time_col)
-    return df
-end
-
-function get_dataframes(results::ResultsByTime)
-    return SortedDict(k => get_dataframe(results, k) for k in keys(results.data))
-end
-
-struct ResultsByKeyAndTime
-    "Contains all keys stored in the model."
-    result_keys::Vector{OptimizationContainerKey}
-    "Contains the results that have been read from the store and cached."
-    cached_results::Dict{OptimizationContainerKey, ResultsByTime}
-end
-
-ResultsByKeyAndTime(result_keys) = ResultsByKeyAndTime(
-    collect(result_keys),
-    Dict{OptimizationContainerKey, ResultsByTime}(),
-)
-
-Base.empty!(res::ResultsByKeyAndTime) = empty!(res.cached_results)
-
 struct DecisionModelSimulationResults <: OperationModelSimulationResults
     variables::ResultsByKeyAndTime
     duals::ResultsByKeyAndTime
@@ -158,42 +114,76 @@ function get_forecast_horizon(res::SimulationProblemResults{DecisionModelSimulat
 end
 
 function _get_store_value(
+    ::Type{T},
     res::SimulationProblemResults{DecisionModelSimulationResults},
     container_keys::Vector{<:OptimizationContainerKey},
     timestamps,
     ::Nothing,
-)
+) where {T <: Union{Matrix{Float64}, DenseAxisArray{Float64, 2}}}
     simulation_store_path = joinpath(get_execution_path(res), "data_store")
     return open_store(HdfSimulationStore, simulation_store_path, "r") do store
-        _get_store_value(res, container_keys, timestamps, store)
+        _get_store_value(T, res, container_keys, timestamps, store)
     end
 end
 
 function _get_store_value(
+    ::Type{DenseAxisArray{Float64, 2}},
     sim_results::SimulationProblemResults{DecisionModelSimulationResults},
     container_keys::Vector{<:OptimizationContainerKey},
     timestamps,
     store::SimulationStore,
 )
     base_power = get_model_base_power(sim_results)
-    results_by_key = Dict{OptimizationContainerKey, ResultsByTime}()
+    results_by_key =
+        Dict{OptimizationContainerKey, ResultsByTime{DenseAxisArray{Float64, 2}}}()
     model_name = Symbol(get_model_name(sim_results))
     resolution = get_resolution(sim_results)
 
     for key in container_keys
-        columns = get_column_names(store, DecisionModelIndexType, model_name, key)
         results_by_time = ResultsByTime(
             key,
-            SortedDict{Dates.DateTime, Matrix{Float64}}(),
-            columns,
+            SortedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}(),
             resolution,
+            get_column_names(store, DecisionModelIndexType, model_name, key),
         )
         for ts in timestamps
-            data = read_result(Array, store, model_name, key, ts)
+            array = read_result(DenseAxisArray, store, model_name, key, ts)
             if convert_result_to_natural_units(key)
-                data .*= base_power
+                array.data .*= base_power
             end
-            results_by_time[ts] = data
+            results_by_time[ts] = array
+        end
+        results_by_key[key] = results_by_time
+    end
+
+    return results_by_key
+end
+
+function _get_store_value(
+    ::Type{Matrix{Float64}},
+    sim_results::SimulationProblemResults{DecisionModelSimulationResults},
+    container_keys::Vector{<:OptimizationContainerKey},
+    timestamps,
+    store::SimulationStore,
+)
+    base_power = get_model_base_power(sim_results)
+    results_by_key = Dict{OptimizationContainerKey, ResultsByTime{Matrix{Float64}}}()
+    model_name = Symbol(get_model_name(sim_results))
+    resolution = get_resolution(sim_results)
+
+    for key in container_keys
+        results_by_time = ResultsByTime{Matrix{Float64}}(
+            key,
+            SortedDict{Dates.DateTime, Matrix{Float64}}(),
+            resolution,
+            get_column_names(store, DecisionModelIndexType, model_name, key),
+        )
+        for ts in timestamps
+            array = read_result(Array, store, model_name, key, ts)
+            if convert_result_to_natural_units(key)
+                array .*= base_power
+            end
+            results_by_time[ts] = array
         end
         results_by_key[key] = results_by_time
     end
@@ -229,12 +219,13 @@ function _process_timestamps(
 end
 
 function _read_results(
+    ::Type{T},
     res::SimulationProblemResults{DecisionModelSimulationResults},
     result_keys,
     timestamps,
-    store,
-)
-    isempty(result_keys) && return Dict{OptimizationContainerKey, ResultsByTime}()
+    store::Union{Nothing, <:SimulationStore},
+) where {T <: Union{Matrix{Float64}, DenseAxisArray{Float64, 2}}}
+    isempty(result_keys) && return Dict{OptimizationContainerKey, ResultsByTime{T}}()
 
     if store === nothing && res.store !== nothing
         # In this case we have an InMemorySimulationStore.
@@ -248,7 +239,7 @@ function _read_results(
         vals = Dict(k => cached_results[k] for k in result_keys)
     else
         @debug "reading results from data store"
-        vals = _get_store_value(res, result_keys, timestamps, store)
+        vals = _get_store_value(T, res, result_keys, timestamps, store)
     end
     return vals
 end
@@ -280,7 +271,9 @@ function read_variable(
 )
     key = _deserialize_key(VariableKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(_read_results(res, [key], timestamps, store)[key])
+    return get_dataframes(
+        _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
+    )
 end
 
 """
@@ -303,7 +296,9 @@ function read_dual(
 )
     key = _deserialize_key(ConstraintKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(_read_results(res, [key], timestamps, store)[key])
+    return get_dataframes(
+        _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
+    )
 end
 
 """
@@ -325,7 +320,9 @@ function read_parameter(
 )
     key = _deserialize_key(ParameterKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(_read_results(res, [key], timestamps, store)[key])
+    return get_dataframes(
+        _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
+    )
 end
 
 """
@@ -347,7 +344,9 @@ function read_aux_variable(
 )
     key = _deserialize_key(AuxVarKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(_read_results(res, [key], timestamps, store)[key])
+    return get_dataframes(
+        _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
+    )
 end
 
 """
@@ -369,7 +368,9 @@ function read_expression(
 )
     key = _deserialize_key(ExpressionKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(_read_results(res, [key], timestamps, store)[key])
+    return get_dataframes(
+        _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
+    )
 end
 
 function get_realized_timestamps(
@@ -411,7 +412,7 @@ function read_results_with_keys(
 )
     meta = RealizedMeta(res; start_time = start_time, len = len)
     timestamps = _process_timestamps(res, meta.start_time, meta.len)
-    result_values = _read_results(res, result_keys, timestamps, nothing)
+    result_values = _read_results(Matrix{Float64}, res, result_keys, timestamps, nothing)
     return get_realization(result_values, meta)
 end
 
@@ -464,23 +465,53 @@ function load_results!(
     function merge_results(store)
         merge!(
             get_cached_variables(res),
-            _read_results(res, variable_keys, res.results_timestamps, store),
+            _read_results(
+                DenseAxisArray{Float64, 2},
+                res,
+                variable_keys,
+                res.results_timestamps,
+                store,
+            ),
         )
         merge!(
             get_cached_duals(res),
-            _read_results(res, dual_keys, res.results_timestamps, store),
+            _read_results(
+                DenseAxisArray{Float64, 2},
+                res,
+                dual_keys,
+                res.results_timestamps,
+                store,
+            ),
         )
         merge!(
             get_cached_parameters(res),
-            _read_results(res, parameter_keys, res.results_timestamps, store),
+            _read_results(
+                DenseAxisArray{Float64, 2},
+                res,
+                parameter_keys,
+                res.results_timestamps,
+                store,
+            ),
         )
         merge!(
             get_cached_aux_variables(res),
-            _read_results(res, aux_variable_keys, res.results_timestamps, store),
+            _read_results(
+                DenseAxisArray{Float64, 2},
+                res,
+                aux_variable_keys,
+                res.results_timestamps,
+                store,
+            ),
         )
         merge!(
             get_cached_expressions(res),
-            _read_results(res, expression_keys, res.results_timestamps, store),
+            _read_results(
+                DenseAxisArray{Float64, 2},
+                res,
+                expression_keys,
+                res.results_timestamps,
+                store,
+            ),
         )
     end
 

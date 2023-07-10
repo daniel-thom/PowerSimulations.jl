@@ -155,10 +155,12 @@ function _get_store_value(
     for key in container_keys
         start_time, _len, resolution = _check_offsets(res, key, store, start_time, len)
         start_index = (start_time - first(res.timestamps)) ÷ resolution + 1
-        df = read_results(store, key; index = start_index, len = _len)
+        array = read_results(store, key; index = start_index, len = _len)
         if convert_result_to_natural_units(key)
-            df .*= base_power
+            # TODO DT: why doesn't DenseAxisArray support this op?
+            array.data .*= base_power
         end
+        df = DataFrames.DataFrame(permutedims(array.data), axes(array)[1])
         time_col = range(start_time; length = _len, step = res.resolution)
         DataFrames.insertcols!(df, 1, :DateTime => time_col)
         results[key] = df
@@ -176,7 +178,7 @@ function _check_offsets(
 )
     dataset_size = get_emulation_model_dataset_size(store, key)
     resolution =
-        (last(res.timestamps) - first(res.timestamps) + res.resolution) ÷ dataset_size[1]
+        (last(res.timestamps) - first(res.timestamps) + res.resolution) ÷ dataset_size
     if isnothing(start_time)
         start_time = first(res.timestamps)
     elseif start_time < first(res.timestamps) || start_time > last(res.timestamps)
@@ -247,6 +249,8 @@ function read_results_with_keys(
     start_time::Union{Nothing, Dates.DateTime} = nothing,
     len::Union{Nothing, Int} = nothing,
 )
+    # TODO DT: this is a double-permutedims with HDF
+    # TODO: we could make an optimized version of this that reads Arrays
     return _read_results(res, result_keys, nothing; start_time = start_time, len = len)
 end
 

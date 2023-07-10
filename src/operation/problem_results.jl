@@ -303,7 +303,7 @@ function _read_results(
     container_keys,
     timestamps,
     time_ids,
-    base_power,
+    base_power::Float64,
 )
     existing_keys = keys(result_values)
     container_keys = container_keys === nothing ? existing_keys : container_keys
@@ -419,7 +419,7 @@ end
 Return the values for all variables.
 """
 function read_variables(res::IS.Results)
-    variables = Dict(x => read_variable(res, x) for x in list_variable_names(res))
+    return Dict(x => read_variable(res, x) for x in list_variable_names(res))
 end
 
 """
@@ -636,7 +636,7 @@ end
 Return the values for all auxiliary variables.
 """
 function read_aux_variables(res::IS.Results)
-    variables = Dict(x => read_aux_variable(res, x) for x in list_aux_variable_names(res))
+    return Dict(x => read_aux_variable(res, x) for x in list_aux_variable_names(res))
 end
 
 """
@@ -714,7 +714,7 @@ end
 Return the values for all expressions.
 """
 function read_expressions(res::IS.Results)
-    expressions = Dict(x => read_expression(res, x) for x in list_expression_names(res))
+    return Dict(x => read_expression(res, x) for x in list_expression_names(res))
 end
 
 function read_results_with_keys(

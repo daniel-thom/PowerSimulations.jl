@@ -771,7 +771,7 @@ function _update_simulation_state!(sim::Simulation, model::DecisionModel)
     for field in fieldnames(DatasetContainer)
         for key in list_decision_model_keys(store, model_name, field)
             !has_dataset(get_decision_states(state), key) && continue
-            res = read_result(DataFrames.DataFrame, store, model_name, key, simulation_time)
+            res = read_result(DenseAxisArray, store, model_name, key, simulation_time)
             update_decision_state!(state, key, res, simulation_time, model_params)
         end
     end
@@ -797,6 +797,7 @@ function _write_state_to_store!(store::SimulationStore, sim::Simulation)
             while _update_timestamp <= state_update_time
                 state_values = get_decision_state_value(sim_state, key, _update_timestamp)
                 ix = get_last_recorded_row(em_store, key) + 1
+                # TODO DT: is this correct?
                 write_result!(store, model_name, key, ix, _update_timestamp, state_values)
                 _update_timestamp += state_resolution
             end

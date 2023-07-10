@@ -2,36 +2,21 @@
 Stores results data for one DecisionModel
 """
 mutable struct DecisionModelStore <: AbstractModelStore
-    duals::Dict{ConstraintKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}}
-    parameters::Dict{ParameterKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}}
-    variables::Dict{VariableKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}}
-    aux_variables::Dict{AuxVarKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}}
-    expressions::Dict{ExpressionKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}}
+    duals::Dict{ConstraintKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
+    parameters::Dict{ParameterKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
+    variables::Dict{VariableKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
+    aux_variables::Dict{AuxVarKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
+    expressions::Dict{ExpressionKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
     optimizer_stats::OrderedDict{Dates.DateTime, OptimizerStats}
 end
 
 function DecisionModelStore()
     return DecisionModelStore(
-        Dict{
-            ConstraintKey,
-            Dict{ConstraintKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}},
-        }(),
-        Dict{
-            ParameterKey,
-            Dict{ParameterKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}},
-        }(),
-        Dict{
-            VariableKey,
-            Dict{VariableKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}},
-        }(),
-        Dict{
-            AuxVarKey,
-            Dict{ConstraintKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}},
-        }(),
-        Dict{
-            AuxVarKey,
-            Dict{ExpressionKey, OrderedDict{Dates.DateTime, DataFrames.DataFrame}},
-        }(),
+        Dict{ConstraintKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
+        Dict{ParameterKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
+        Dict{VariableKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
+        Dict{AuxVarKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
+        Dict{ExpressionKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
         OrderedDict{Dates.DateTime, OptimizerStats}(),
     )
 end
@@ -52,14 +37,16 @@ function initialize_storage!(
             !should_write_resulting_value(key) && continue
             @debug "Adding $(encode_key_as_string(key)) to DecisionModelStore" _group =
                 LOG_GROUP_MODEL_STORE
-            results_container[key] = OrderedDict{Dates.DateTime, DataFrames.DataFrame}()
             column_names = get_column_names(key, field_container)
+            data = OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}()
             for timestamp in
                 range(initial_time; step = model_interval, length = num_of_executions)
-                results_container[key][timestamp] = DataFrames.DataFrame(
-                    OrderedDict(c => fill(NaN, time_steps_count) for c in column_names),
+                data[timestamp] = fill!(
+                    DenseAxisArray{Float64}(undef, column_names, 1:time_steps_count),
+                    NaN,
                 )
             end
+            results_container[key] = data
         end
     end
 end
@@ -70,10 +57,18 @@ function write_result!(
     key::OptimizationContainerKey,
     index::DecisionModelIndexType,
     update_timestamp::Dates.DateTime,
-    array::AbstractArray,
+    array::DenseAxisArray,
 )
-    df = axis_array_to_dataframe(array, key)
-    write_result!(store, name, key, index, update_timestamp, df)
+    columns = axes(array)[1]
+    if eltype(columns) !== String
+        # TODO: This happens because buses are stored by indexes instead of name.
+        columns = string.(columns)
+    end
+    # TODO DT: this used to be union of df and df-row; what happens with row?
+    container = getfield(store, get_store_container_type(key))
+    # TODO DT: do better. Do the conversion at a higher level?
+    # TODO DT: in-place overwrite instead?
+    container[key][index] = DenseAxisArray(jump_value.(array.data), columns, 1:size(array)[2])
     return
 end
 
@@ -83,10 +78,13 @@ function write_result!(
     key::OptimizationContainerKey,
     index::DecisionModelIndexType,
     update_timestamp::Dates.DateTime,
-    df::Union{DataFrames.DataFrame, DataFrames.DataFrameRow},
+    data::Array,
 )
+    error("exit early write_result! with data = $data")
+    # TODO DT: this used to be union of df and df-row; what happens with row?
     container = getfield(store, get_store_container_type(key))
-    container[key][index] = df
+    # TODO DT: in-place overwrite instead?
+    container[key][index].data = data
     return
 end
 
@@ -103,7 +101,7 @@ function read_results(
     end
 
     # Return a copy because callers may mutate it.
-    return copy(data[index]; copycols = true)
+    return deepcopy(data[index])
 end
 
 function write_optimizer_stats!(
@@ -127,5 +125,5 @@ end
 
 function get_column_names(store::DecisionModelStore, key::OptimizationContainerKey)
     container = getfield(store, get_store_container_type(key))
-    return Tuple(names(first(values(container[key]))))
+    return axes(first(values(container[key])))[1]
 end
