@@ -5,6 +5,9 @@ struct ResultsByTime{T}
     column_names::Vector{String}
 end
 
+# TODO: constructor for DenseAxisArray should compare column names
+# TODO: constructor for Matrix should compare lenght of column names
+
 # This struct behaves like a dict, delegating to its 'data' field.
 Base.length(res::ResultsByTime) = length(res.data)
 Base.iterate(res::ResultsByTime) = iterate(res.data)
@@ -14,8 +17,6 @@ Base.setindex!(res::ResultsByTime, v, i) = setindex!(res.data, v, i)
 Base.firstindex(res::ResultsByTime) = firstindex(res.data)
 Base.lastindex(res::ResultsByTime) = lastindex(res.data)
 
-#get_column_names(x::ResultsByTime) = get_column_names(x, first(keys(x.data)))
-#get_column_names(x::ResultsByTime, timestamp) = axes(x.data[timestamp])[1]
 get_column_names(x::ResultsByTime) = x.column_names
 get_column_names(x::ResultsByTime, timestamp) = x.column_names
 get_num_rows(::ResultsByTime{DenseAxisArray{Float64, 2}}, data) = length(axes(data)[2])

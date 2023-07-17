@@ -361,7 +361,6 @@ function read_result(
     else
         data, columns = _read_result(store, model_name, key, index)
     end
-    # Prioritize row access.
     return DenseAxisArray(permutedims(data), columns, 1:size(data)[1])
 end
 
@@ -401,7 +400,6 @@ function read_results(
     end
     columns = get_column_names(key, dataset)
     @assert_op size(data)[2] == length(columns)
-    # Prioritize row access.
     return DenseAxisArray(permutedims(data), columns, 1:size(data)[1])
 end
 
@@ -419,7 +417,6 @@ end
 function get_column_names(
     store::HdfSimulationStore,
     ::Type{EmulationModelIndexType},
-    #model_name::Symbol,
     key::OptimizationContainerKey,
 )
     !isopen(store) && throw(ArgumentError("store must be opened prior to reading"))
@@ -859,9 +856,7 @@ function _read_data_columns(
     key::OptimizationContainerKey,
     index::DecisionModelIndexType,
 )
-    was_cached = false
     if is_cached(store.cache, model_name, key, index)
-        was_cached = true
         data = read_result(store.cache, model_name, key, index)
         column_dataset = _get_dm_dataset(store, model_name, key).column_dataset
         columns = column_dataset[:]

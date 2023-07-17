@@ -141,7 +141,6 @@ function initialize_problem_storage!(
     for type in STORE_CONTAINERS
         for (key, reqs) in getfield(em_problem_reqs, type)
             container = get_data_field(get_em_data(store), type)
-            # Prioritize row access.
             container[key] = InMemoryDataset(
                 fill!(
                     DenseAxisArray{Float64}(undef, reqs["columns"], 1:reqs["dims"][1]),

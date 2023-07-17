@@ -303,7 +303,7 @@ function _read_results(
     container_keys,
     timestamps,
     time_ids,
-    base_power::Float64,
+    base_power::Float64,  # TODO DT what about int?
 )
     existing_keys = keys(result_values)
     container_keys = container_keys === nothing ? existing_keys : container_keys

@@ -2,21 +2,22 @@
 Stores results data for one DecisionModel
 """
 mutable struct DecisionModelStore <: AbstractModelStore
-    duals::Dict{ConstraintKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
-    parameters::Dict{ParameterKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
-    variables::Dict{VariableKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
-    aux_variables::Dict{AuxVarKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
-    expressions::Dict{ExpressionKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}
+    # All DenseAxisArrays have axes (column names, row indexes)
+    duals::Dict{ConstraintKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
+    parameters::Dict{ParameterKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
+    variables::Dict{VariableKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
+    aux_variables::Dict{AuxVarKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
+    expressions::Dict{ExpressionKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
     optimizer_stats::OrderedDict{Dates.DateTime, OptimizerStats}
 end
 
 function DecisionModelStore()
     return DecisionModelStore(
-        Dict{ConstraintKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
-        Dict{ParameterKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
-        Dict{VariableKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
-        Dict{AuxVarKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
-        Dict{ExpressionKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}}(),
+        Dict{ConstraintKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}(),
+        Dict{ParameterKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}(),
+        Dict{VariableKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}(),
+        Dict{AuxVarKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}(),
+        Dict{ExpressionKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}(),
         OrderedDict{Dates.DateTime, OptimizerStats}(),
     )
 end
@@ -38,7 +39,7 @@ function initialize_storage!(
             @debug "Adding $(encode_key_as_string(key)) to DecisionModelStore" _group =
                 LOG_GROUP_MODEL_STORE
             column_names = get_column_names(key, field_container)
-            data = OrderedDict{Dates.DateTime, DenseAxisArray{Float64}}()
+            data = OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}()
             for timestamp in
                 range(initial_time; step = model_interval, length = num_of_executions)
                 data[timestamp] = fill!(
@@ -57,7 +58,7 @@ function write_result!(
     key::OptimizationContainerKey,
     index::DecisionModelIndexType,
     update_timestamp::Dates.DateTime,
-    array::DenseAxisArray,
+    array::DenseAxisArray{<:Any, 2},
 )
     columns = axes(array)[1]
     if eltype(columns) !== String
@@ -66,27 +67,24 @@ function write_result!(
     end
     # TODO DT: this used to be union of df and df-row; what happens with row?
     container = getfield(store, get_store_container_type(key))
-    # TODO DT: do better. Do the conversion at a higher level?
     # TODO DT: in-place overwrite instead?
-    container[key][index] = DenseAxisArray(jump_value.(array.data), columns, 1:size(array)[2])
+    container[key][index] = DenseAxisArray(array.data, columns, 1:size(array)[2])
     return
 end
 
-function write_result!(
-    store::DecisionModelStore,
-    ::Symbol,
-    key::OptimizationContainerKey,
-    index::DecisionModelIndexType,
-    update_timestamp::Dates.DateTime,
-    data::Array,
-)
-    error("exit early write_result! with data = $data")
-    # TODO DT: this used to be union of df and df-row; what happens with row?
-    container = getfield(store, get_store_container_type(key))
-    # TODO DT: in-place overwrite instead?
-    container[key][index].data = data
-    return
-end
+# TODO DT: delete?
+#function write_result!(
+#    store::DecisionModelStore,
+#    ::Symbol,
+#    key::OptimizationContainerKey,
+#    index::DecisionModelIndexType,
+#    update_timestamp::Dates.DateTime,
+#    data::Array,
+#)
+#    container = getfield(store, get_store_container_type(key))
+#    container[key][index].data = data
+#    return
+#end
 
 function read_results(
     store::DecisionModelStore,

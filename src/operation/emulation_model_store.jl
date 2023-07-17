@@ -86,6 +86,7 @@ function initialize_storage!(
     return
 end
 
+# TODO DT
 #function write_result!(
 #    store::EmulationModelStore,
 #    name::Symbol,
@@ -122,7 +123,7 @@ function write_result!(
     container = get_data_field(store, get_store_container_type(key))
     set_value!(
         container[key],
-        DenseAxisArray(jump_value.(array.data), axes(array)[1]),
+        DenseAxisArray(array.data, axes(array)[1]),
         index,
     )
     set_last_recorded_row!(container[key], index)

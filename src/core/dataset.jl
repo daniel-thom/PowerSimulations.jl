@@ -23,7 +23,7 @@ end
 
 mutable struct InMemoryDataset <: AbstractDataset
     "Data with dimensions (column names, row indexes)"
-    values::DenseAxisArray{Float64}
+    values::DenseAxisArray{Float64, 2}
     # We use Array here to allow for overwrites when updating the state
     timestamps::Vector{Dates.DateTime}
     # Resolution is needed because AbstractDataset might have just one row
@@ -34,7 +34,7 @@ mutable struct InMemoryDataset <: AbstractDataset
 end
 
 function InMemoryDataset(
-    values::DenseAxisArray{Float64},
+    values::DenseAxisArray{Float64, 2},
     timestamps::Vector{Dates.DateTime},
     resolution::Dates.Millisecond,
     end_of_step_index::Int,
@@ -49,7 +49,7 @@ function InMemoryDataset(
     )
 end
 
-function InMemoryDataset(values::DenseAxisArray{Float64})
+function InMemoryDataset(values::DenseAxisArray{Float64, 2})
     return InMemoryDataset(
         values,
         Vector{Dates.DateTime}(),
@@ -61,7 +61,7 @@ function InMemoryDataset(values::DenseAxisArray{Float64})
 end
 
 function make_system_state(
-    values::DenseAxisArray{Float64},
+    values::DenseAxisArray{Float64, 2},
     timestamp::Dates.DateTime,
     resolution::Dates.Millisecond,
 )

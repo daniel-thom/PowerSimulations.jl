@@ -324,12 +324,6 @@ read_expression(model::OperationModel, key::ExpressionKey) = _read_results(model
 function _read_results(model::OperationModel, key::OptimizationContainerKey)
     res = read_results(get_store(model), key)
     return DataFrames.DataFrame(permutedims(res.data), axes(res)[1])
-    #return Dict(k => DataFrames.DataFrame(permutedims(v.data), axes(v)[1]) for (k, v) in read_results(get_store(model), key))
-    #@show res typeof(res)
-    #for (k, v) in read_results(get_store(model), key)
-    #    @show k v
-    #end
-    #return Dict(k => DataFrames.DataFrame(permutedims(v.data), axes(v)[1]) for (k, v) in read_results(get_store(model), key))
 end
 
 read_optimizer_stats(model::OperationModel) = read_optimizer_stats(get_store(model))
