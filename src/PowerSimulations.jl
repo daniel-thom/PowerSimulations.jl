@@ -579,7 +579,8 @@ include("utils/datetime_utils.jl")
 include("utils/generate_valid_formulations.jl")
 
 # TODO: These exist for backward compatibility and need to be deprecated and removed.
-read_aux_variables_with_keys(args...; kwargs...) = read_results_with_keys(args...; kwargs...)
+read_aux_variables_with_keys(args...; kwargs...) =
+    read_results_with_keys(args...; kwargs...)
 read_duals_with_keys(args...; kwargs...) = read_results_with_keys(args...; kwargs...)
 read_expressions_with_keys(args...; kwargs...) = read_results_with_keys(args...; kwargs...)
 read_parameters_with_keys(args...; kwargs...) = read_results_with_keys(args...; kwargs...)

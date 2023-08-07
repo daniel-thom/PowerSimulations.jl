@@ -1,6 +1,5 @@
 abstract type AbstractDataset end
 
-Base.length(s::AbstractDataset) = size(s.values)[2]
 get_data_resolution(s::AbstractDataset)::Dates.Millisecond = s.resolution
 get_last_recorded_row(s::AbstractDataset) = s.last_recorded_row
 
@@ -60,19 +59,14 @@ function InMemoryDataset(values::DenseAxisArray{Float64, 2})
     )
 end
 
+Base.length(s::InMemoryDataset) = size(s.values)[2]
+
 function make_system_state(
     values::DenseAxisArray{Float64, 2},
     timestamp::Dates.DateTime,
     resolution::Dates.Millisecond,
 )
-    return InMemoryDataset(
-        values,
-        [timestamp],
-        resolution,
-        0,
-        1,
-        UNSET_INI_TIME,
-    )
+    return InMemoryDataset(values, [timestamp], resolution, 0, 1, UNSET_INI_TIME)
 end
 
 function get_dataset_value(s::InMemoryDataset, date::Dates.DateTime)
@@ -139,12 +133,17 @@ mutable struct HDF5Dataset <: AbstractDataset
 
     function HDF5Dataset(values, column_dataset, write_index, last_recorded_row, resolution,
         initial_timestamp,
-        update_timestamp, column_names)
+        update_timestamp, column_names,
+    )
         new(values, column_dataset, write_index, last_recorded_row, resolution,
             initial_timestamp,
             update_timestamp, column_names)
     end
 end
+
+#Base.length(s::HDF5Dataset) = size(s.values)[1]  # TODO DT: what about the 3-dim case?
+# Not getting called by tests
+Base.length(s::HDF5Dataset) = error("die")
 
 HDF5Dataset(values, column_dataset, resolution, initial_time) =
     HDF5Dataset(

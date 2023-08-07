@@ -86,19 +86,6 @@ function initialize_storage!(
     return
 end
 
-# TODO DT
-#function write_result!(
-#    store::EmulationModelStore,
-#    name::Symbol,
-#    key::OptimizationContainerKey,
-#    index::EmulationModelIndexType,
-#    update_timestamp::Dates.DateTime,
-#    array::AbstractArray,
-#)
-#    write_result!(store, name, key, index, update_timestamp, array)
-#    return
-#end
-
 function write_result!(
     store::EmulationModelStore,
     name::Symbol,
@@ -123,7 +110,7 @@ function write_result!(
     container = get_data_field(store, get_store_container_type(key))
     set_value!(
         container[key],
-        DenseAxisArray(array.data, axes(array)[1]),
+        array,
         index,
     )
     set_last_recorded_row!(container[key], index)

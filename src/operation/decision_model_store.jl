@@ -7,7 +7,10 @@ mutable struct DecisionModelStore <: AbstractModelStore
     parameters::Dict{ParameterKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
     variables::Dict{VariableKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
     aux_variables::Dict{AuxVarKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
-    expressions::Dict{ExpressionKey, OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}}}
+    expressions::Dict{
+        ExpressionKey,
+        OrderedDict{Dates.DateTime, DenseAxisArray{Float64, 2}},
+    }
     optimizer_stats::OrderedDict{Dates.DateTime, OptimizerStats}
 end
 
@@ -65,26 +68,10 @@ function write_result!(
         # TODO: This happens because buses are stored by indexes instead of name.
         columns = string.(columns)
     end
-    # TODO DT: this used to be union of df and df-row; what happens with row?
     container = getfield(store, get_store_container_type(key))
-    # TODO DT: in-place overwrite instead?
     container[key][index] = DenseAxisArray(array.data, columns, 1:size(array)[2])
     return
 end
-
-# TODO DT: delete?
-#function write_result!(
-#    store::DecisionModelStore,
-#    ::Symbol,
-#    key::OptimizationContainerKey,
-#    index::DecisionModelIndexType,
-#    update_timestamp::Dates.DateTime,
-#    data::Array,
-#)
-#    container = getfield(store, get_store_container_type(key))
-#    container[key][index].data = data
-#    return
-#end
 
 function read_results(
     store::DecisionModelStore,

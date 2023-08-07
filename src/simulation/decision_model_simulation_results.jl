@@ -271,7 +271,7 @@ function read_variable(
 )
     key = _deserialize_key(VariableKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(
+    return make_dataframes(
         _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
     )
 end
@@ -296,7 +296,7 @@ function read_dual(
 )
     key = _deserialize_key(ConstraintKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(
+    return make_dataframes(
         _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
     )
 end
@@ -320,7 +320,7 @@ function read_parameter(
 )
     key = _deserialize_key(ParameterKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(
+    return make_dataframes(
         _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
     )
 end
@@ -344,7 +344,7 @@ function read_aux_variable(
 )
     key = _deserialize_key(AuxVarKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(
+    return make_dataframes(
         _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
     )
 end
@@ -368,7 +368,7 @@ function read_expression(
 )
     key = _deserialize_key(ExpressionKey, res, args...)
     timestamps = _process_timestamps(res, initial_time, count)
-    return get_dataframes(
+    return make_dataframes(
         _read_results(DenseAxisArray{Float64, 2}, res, [key], timestamps, store)[key],
     )
 end

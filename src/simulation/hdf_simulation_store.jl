@@ -386,8 +386,6 @@ function read_results(
     index::Union{Nothing, EmulationModelIndexType} = nothing,
     len::Union{Nothing, Int} = nothing,
 )
-    # TODO DT: remove redundancy
-    # Do we actually need this one?
     dataset = _get_em_dataset(store, key)
     @assert_op ndims(dataset.values) == 2
     if isnothing(index)

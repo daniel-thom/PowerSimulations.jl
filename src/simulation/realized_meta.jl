@@ -63,7 +63,6 @@ function get_realization(
             first_id = step > 1 ? 1 : meta.start_offset
             last_id =
                 step == meta.len ? meta.interval_len - meta.end_offset : meta.interval_len
-            # TODO DT: need to ensure that this accounts for the warning message I deleted in _read_results
             if last_id - first_id > size(array, 1)
                 error(
                     "Variable $(encode_key_as_string(key)) has $(size(array, 1)) number of steps, that is different than the default problem horizon. \

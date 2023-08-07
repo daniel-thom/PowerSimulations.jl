@@ -90,7 +90,6 @@ function write_model_parameter_results!(
     for (key, container) in parameters
         !should_write_resulting_value(key) && continue
         data = calculate_parameter_values(container)
-        # TODO DT: jump_value has been called
         write_result!(store, model_name, key, index, update_timestamp, data)
 
         if export_params !== nothing &&
@@ -98,6 +97,8 @@ function write_model_parameter_results!(
             resolution = export_params[:resolution]
             file_type = export_params[:file_type]
             # TODO DT: why was jump_value being called again?
+            # (first time was in calculate_parameter_values)
+            # Was it always a noop?
             df = to_dataframe(data, key)
             #df = to_dataframe(jump_value.(data), key)
             time_col = range(index; length = horizon, step = resolution)

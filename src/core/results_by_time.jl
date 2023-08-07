@@ -5,8 +5,29 @@ struct ResultsByTime{T}
     column_names::Vector{String}
 end
 
-# TODO: constructor for DenseAxisArray should compare column names
-# TODO: constructor for Matrix should compare lenght of column names
+function ResultsByTime(key, data, resolution, column_names)
+    _check_column_consistency(data, column_names)
+    ResultsByTime(key, data, resolution, column_names)
+end
+
+function _check_column_consistency(
+    data::SortedDict{Dates.DateTime, DenseAxisArray{Float64, 2}},
+    cols,
+)
+    for val in values(data)
+        if axes(val)[1] != cols
+            error("Mismatch in DenseAxisArray column names: $(axes(val)[1]) $cols")
+        end
+    end
+end
+
+function _check_column_consistency(data::SortedDict{Dates.DateTime, Matrix{Float64}}, cols)
+    for val in values(data)
+        if size(val)[2] != length(cols)
+            error("Mismatch in length of Matrix columns: $(size(val)[2]) $(length(cols))")
+        end
+    end
+end
 
 # This struct behaves like a dict, delegating to its 'data' field.
 Base.length(res::ResultsByTime) = length(res.data)
@@ -18,7 +39,6 @@ Base.firstindex(res::ResultsByTime) = firstindex(res.data)
 Base.lastindex(res::ResultsByTime) = lastindex(res.data)
 
 get_column_names(x::ResultsByTime) = x.column_names
-get_column_names(x::ResultsByTime, timestamp) = x.column_names
 get_num_rows(::ResultsByTime{DenseAxisArray{Float64, 2}}, data) = length(axes(data)[2])
 get_num_rows(::ResultsByTime{Matrix{Float64}}, data) = size(data)[1]
 
@@ -28,7 +48,7 @@ function _add_timestamps!(df::DataFrames.DataFrame, results::ResultsByTime, time
     DataFrames.insertcols!(df, 1, :DateTime => time_col)
 end
 
-function get_dataframe(
+function make_dataframe(
     results::ResultsByTime{DenseAxisArray{Float64, 2}},
     timestamp::Dates.DateTime,
 )
@@ -38,15 +58,15 @@ function get_dataframe(
     return df
 end
 
-function get_dataframe(results::ResultsByTime{Matrix{Float64}}, timestamp::Dates.DateTime)
+function make_dataframe(results::ResultsByTime{Matrix{Float64}}, timestamp::Dates.DateTime)
     array = results.data[timestamp]
     df = DataFrames.DataFrame(array, results.column_names)
     _add_timestamps!(df, results, timestamp, array)
     return df
 end
 
-function get_dataframes(results::ResultsByTime)
-    return SortedDict(k => get_dataframe(results, k) for k in keys(results.data))
+function make_dataframes(results::ResultsByTime)
+    return SortedDict(k => make_dataframe(results, k) for k in keys(results.data))
 end
 
 struct ResultsByKeyAndTime
